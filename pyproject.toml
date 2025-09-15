@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "revshell"
+dynamic = ["version"]
+description = "Reverse shell payload generator"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "crypt0lith" }]
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX",
+    "Environment :: Console",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = ["regex"]
+
+[project.urls]
+repository = "https://github.com/crypt0lith/revshell.git"
+
+[project.scripts]
+revshell = "revshell.__main__:main"
+revshell-completions = "revshell._completions:main"
+
+[tool.setuptools_scm]
+write_to = "revshell/_version.py"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["revshell*"]
+
+[tool.black]
+preview = true
+skip-string-normalization = true
+target-version = ["py313"]
