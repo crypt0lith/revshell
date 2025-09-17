@@ -3,6 +3,7 @@ import socket
 import struct
 from array import array
 from functools import lru_cache, wraps
+from inspect import Parameter
 from itertools import chain
 from typing import Callable
 
@@ -33,26 +34,32 @@ except ImportError:
     get_local_interfaces = lambda: {}
 
 
+@lru_cache
+def _signature(__f: Callable):
+    return inspect.signature(__f)
+
+
 def get_kwdefaults(__f: Callable):
     if not callable(__f):
         raise TypeError
     try:
         return {
             v.name: v.default
-            for v in inspect.signature(__f).parameters.values()
-            if v.kind is v.KEYWORD_ONLY and v.default is not v.empty
+            for v in _signature(__f).parameters.values()
+            if v.kind is Parameter.KEYWORD_ONLY and v.default is not Parameter.empty
         } or None
     except Exception:
         return
 
 
 def kwdefaults_from(*callables: Callable) -> Callable:
-    src_kwdefaults = {
-        k: v for d in map(get_kwdefaults, callables) for k, v in dict.items(d or {})
+    kwdefaults = {
+        k: v for d in map(get_kwdefaults, callables) for k, v in (d or {}).items()
     }
 
     def decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
-        sig = inspect.signature(func)
+        kw_only = (get_kwdefaults(func) or {}) | kwdefaults
+        sig = _signature(func)
         new_sig = inspect.Signature(
             [
                 x
@@ -64,13 +71,11 @@ def kwdefaults_from(*callables: Callable) -> Callable:
                                 (
                                     p
                                     for p in sig.parameters.values()
-                                    if p.kind is not inspect.Parameter.KEYWORD_ONLY
+                                    if p.kind is not Parameter.KEYWORD_ONLY
                                 ),
                                 (
-                                    inspect.Parameter(
-                                        k, inspect.Parameter.KEYWORD_ONLY, default=v
-                                    )
-                                    for k, v in src_kwdefaults.items()
+                                    Parameter(k, Parameter.KEYWORD_ONLY, default=v)
+                                    for k, v in kw_only.items()
                                 ),
                             )
                         )
@@ -83,12 +88,12 @@ def kwdefaults_from(*callables: Callable) -> Callable:
 
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs):
-            for k, v in src_kwdefaults.items():
+            for k, v in kw_only.items():
                 kwargs.setdefault(k, v)
             return func(*args, **kwargs)
 
         wrapper.__signature__ = new_sig
-        wrapper.__kwdefaults__ = src_kwdefaults.copy() or None
+        wrapper.__kwdefaults__ = kw_only.copy() if kw_only else None
         return wrapper
 
     return decorator
