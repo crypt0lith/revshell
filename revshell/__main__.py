@@ -53,29 +53,24 @@ def kv_pair_re():
     def one_or_more(__s: str):
         return f"{group(__s)}+"
 
-    def maybe(__s: str):
-        return f"{__s}?"
-
     def any_of(*choices: str):
         return group('|'.join(choices))
 
-    define = "(?(DEFINE)%s)"
-    define %= r"(?P<digit>\d(?:_?\d)*)"
-    digit = '(?&digit)'
+    pattern = "(?(DEFINE)%s)"
+    pattern %= r"(?P<digit>\d(?:_?\d)*)"
     hex_radix = '[xX]' + one_or_more(r'_?\p{AHex}')
     oct_radix = '[oO]' + one_or_more(r'_?[0-7]')
     bin_radix = '[bB]' + one_or_more(r'_?[0-1]')
     radix = '0' + any_of(hex_radix, oct_radix, bin_radix)
-    maybe_digit = maybe(digit)
-    float_or_complex = rf"{maybe_digit}\.{maybe_digit}"
-    float_or_complex += maybe(group('[eE]' + digit))
-    float_or_complex += maybe('[jJ]')
+    digit = '(?&digit)'
+    float_or_complex = rf"{digit}?\.{digit}?"
+    float_or_complex += f"{group('[eE]' + digit)}?[jJ]?"
     float_or_complex = any_of(float_or_complex, digit)
-    number = group(maybe('-') + any_of(radix, float_or_complex))
-    value = any_of(*named_groups(literal=f"{None}|{number}", str='.*'))
-    key = named_groups(key=r"[_\w]+")[0]
-    pattern = define
-    pattern += f"^{key}={value}$"
+    number = group(f"-?{any_of(radix, float_or_complex)}")
+    key, *value = named_groups(
+        key=r"[_a-zA-Z][_a-zA-Z\d]*", literal=f"{None}|{number}", str='.*'
+    )
+    pattern += f"^{key}={any_of(*value)}$"
     return re.compile(pattern)
 
 
