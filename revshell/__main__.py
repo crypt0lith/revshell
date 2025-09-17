@@ -1,3 +1,4 @@
+import inspect
 import sys
 from ast import literal_eval
 from functools import lru_cache
@@ -9,7 +10,36 @@ import regex as re
 from . import __name__ as prog
 from .util import get_kwdefaults, get_local_interfaces
 
-# IPV4_RE = re.compile(r"(?:(?P<u8>25[0-5]|2[0-4]\d|1?\d?\d)\.){3}\g<u8>")
+
+def init_formatters():
+    def inner(module: ModuleType) -> Iterator[tuple[str, FunctionType]]:
+        for name in getattr(module, '__all__', []):
+            x = getattr(module, name)
+            if isinstance(x, ModuleType):
+                yield from inner(x)
+            elif isinstance(x, FunctionType):
+                try:
+                    sig = inspect.signature(x)
+                except Exception:
+                    continue
+                for varname in {'lhost', 'lport'}:
+                    for p in sig.parameters.values():
+                        if p.name == varname and p.kind in {
+                            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                            inspect.Parameter.KEYWORD_ONLY,
+                        }:
+                            break
+                    else:
+                        break
+                else:
+                    ident = x.__module__.removeprefix(prog).strip('.')
+                    ident = '/'.join(ident.split('.') + [x.__name__])
+                    yield (ident, x)
+
+    return {k: v for k, v in inner(sys.modules[prog])}
+
+
+_REVSHELL_FORMATTERS = init_formatters()
 
 
 @lru_cache(maxsize=1)
@@ -43,27 +73,10 @@ def kv_pair_re():
     float_or_complex = any_of(float_or_complex, digit)
     number = group(maybe('-') + any_of(radix, float_or_complex))
     value = any_of(*named_groups(literal=f"{None}|{number}", str='.*'))
-    [key] = named_groups(key=r"[_\w]+")
+    key = named_groups(key=r"[_\w]+")[0]
     pattern = define
     pattern += f"^{key}={value}$"
     return re.compile(pattern)
-
-
-def init_formatters():
-    def inner(module: ModuleType) -> Iterator[tuple[str, FunctionType]]:
-        for name in getattr(module, '__all__', []):
-            x = getattr(module, name)
-            if isinstance(x, ModuleType):
-                yield from inner(x)
-            elif isinstance(x, FunctionType):
-                ident = x.__module__.removeprefix(prog).strip('.')
-                ident = '/'.join(ident.split('.') + [x.__name__])
-                yield (ident, x)
-
-    return {k: v for k, v in inner(sys.modules[prog])}
-
-
-_REVSHELL_FORMATTERS = init_formatters()
 
 
 def kv_pair(__s: str) -> tuple[str, Optional[str | int | float | complex]]:
