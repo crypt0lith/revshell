@@ -1,1 +1,9 @@
-* text=auto eol=lf
+# python sources
+*.py	text diff=python
+*.pyi	text diff=python
+
+# documents
+*.md	text diff=markdown
+
+# serialization
+*.toml	text
