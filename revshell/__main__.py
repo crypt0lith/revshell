@@ -116,6 +116,7 @@ def main():
     top = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
     fmt_help = top.add_argument_group('payload help')
     fmt_help.add_argument(
+        "-l",
         "--list-payloads",
         dest="list_payloads",
         action="store_true",
