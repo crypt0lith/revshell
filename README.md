@@ -11,26 +11,18 @@ Resolves network interface names to IPv4 addresses for `LHOST`.
 ### Simple usage
 
 ```bash
-revshell cmd/unix/reverse_bash tun0 1337 -v bash_path=/usr/bin/bash -v shell_path=/bin/sh | xclip -sel clip
+revshell cmd/unix/reverse_bash tun0 4444 -v bash_path=/usr/bin/bash -v shell_path=/bin/sh | xclip -sel c
 
 # View help
-revshell --list-payloads
+revshell --list
 revshell --show-options cmd/unix/reverse_bash
 ```
 
 ## Installation
 
+Install the package using `pipx` (recommended):
 ```bash
-git clone https://github.com/crypt0lith/revshell.git
-cd revshell
-pip install .
-```
-
-## Shell completions
-
-```bash
-revshell-completions        # bash by default
-revshell-completions zsh    # zsh completions
+pipx install git+https://github.com/crypt0lith/revshell.git
 ```
 
 ## License

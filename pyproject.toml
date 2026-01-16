@@ -24,7 +24,6 @@ repository = "https://github.com/crypt0lith/revshell.git"
 
 [project.scripts]
 revshell = "revshell.__main__:main"
-revshell-completions = "revshell._completions:main"
 
 [tool.setuptools_scm]
 write_to = "revshell/_version.py"

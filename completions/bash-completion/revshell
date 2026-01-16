@@ -1,0 +1,8 @@
+__revshell() {
+	local cur="${COMP_WORDS[COMP_CWORD]}"
+	COMPREPLY=()
+	if (( COMP_CWORD == 1 )); then
+	    COMPREPLY=( $(compgen -W "$(revshell --list 2>/dev/null | cut -f1)" -- "$cur") )
+	fi
+}
+complete -F __revshell revshell

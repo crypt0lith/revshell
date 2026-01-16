@@ -1,0 +1,95 @@
+#compdef revshell
+#description:reverse shell payload generator
+
+local -A opt_args
+
+__revshell_caching_policy() {
+    local -a oldp
+    oldp=( "$1"(Nmh+12) )
+    (( $#oldp ))
+}
+
+__revshell_payloads() {
+    zstyle ":completion:${curcontext}:" cache-policy __revshell_caching_policy
+    local -a lines
+    if _cache_invalid revshell_payloads || ! _retrieve_cache revshell_payloads; then
+        lines=("${(@f)$(revshell --list 2>/dev/null)}")
+        _store_cache revshell_payloads lines
+    fi
+    print -rl -- "${lines[@]}"
+}
+
+__revshell_describe_payloads() {
+    local -a payloads
+    local p d
+    while IFS=$'\t' read -r p d; do
+        [[ -z "$p" ]] && continue
+        [[ -n "$d" ]] && payloads+=("${p}:${d}") || payloads+=("$p")
+    done < <(__revshell_payloads)
+    (( ${#payloads} )) || return 1
+    _describe -t payloads "PAYLOAD" payloads
+}
+
+__revshell_current_payload() {
+    local w
+    for w in "${words[@]:1}"; do
+        case "$w" in
+            (-*) continue ;;
+            (*) print -r "$w"; return 0 ;;
+        esac
+    done
+    return 1
+}
+
+__revshell_payload_options() {
+    local payload="$1"
+    [[ -z "$payload" ]] && return 1
+    zstyle ":completion:${curcontext}:" cache-policy __revshell_caching_policy
+    local cache_key="revshell_opts_${payload}"
+    local -a lines
+    if _cache_invalid "$cache_key" || ! _retrieve_cache "$cache_key"; then
+        lines=("${(@f)$(revshell --show-options "$payload" 2>/dev/null)}")
+        _store_cache "$cache_key" lines
+    fi
+    print -rl -- "${lines[@]}"
+}
+
+__revshell_complete_assign() {
+    local payload
+    payload="$(__revshell_current_payload)" || return 1
+
+    local k v
+
+    if compset -P '*='; then
+        while IFS=$'\t' read -r k v; do
+            [[ "$k" == "${IPREFIX[1,-2]}" ]] || continue
+            [[ -n "$v" ]] && compadd -- "$v"
+            return 0
+        done < <(__revshell_payload_options "$payload")
+        return 0
+    fi
+
+    local -a assigns
+
+    while IFS=$'\t' read -r k v; do
+        [[ -z "$k" ]] && continue
+        [[ -n "$v" ]] && assigns+=("${k}=${v}") || assigns+=("${k}=")
+    done < <(__revshell_payload_options "$payload")
+
+    (( ${#assigns} )) || return 1
+    _describe -t assigns "assignments" assigns
+}
+
+if [[ -z "$(__revshell_current_payload 2>/dev/null)" ]]; then
+    _arguments -C \
+        '(-h --help)'{-h,--help}'[show help]' \
+        '(-l --list)'{-l,--list}'[list available payloads]' \
+        '--show-options[show options for a payload]:payload:__revshell_describe_payloads' \
+        '1:PAYLOAD:__revshell_describe_payloads'
+else
+    _arguments -C \
+        '*'{-v,--assign}'[assign VAR=VAL]:VAR=VAL:__revshell_complete_assign' \
+        '1:PAYLOAD:__revshell_describe_payloads' \
+        '2:LHOST:_net_interfaces' \
+        '3:LPORT:((4444 443 31337 8080))'
+fi
