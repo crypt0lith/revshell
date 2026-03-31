@@ -222,7 +222,7 @@ def main():
         help="list all currently available payloads and exit",
     )
     fmt_help.add_argument(
-        "--show-options",
+        "--list-options",
         dest="show_options",
         choices=payload_options,
         type=payload_opt,
@@ -272,7 +272,7 @@ def main():
         help=dedent("""\
             assigns value VAL to variable VAR,
             for kwargs to the payload function.
-            show var defaults with '--show-options'
+            show var defaults with '--list-options'
             """),
         default=argparse.SUPPRESS,
     )

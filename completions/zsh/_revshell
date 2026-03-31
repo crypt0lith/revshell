@@ -48,7 +48,7 @@ __revshell_payload_options() {
     local cache_key="revshell_opts_${payload}"
     local -a lines
     if _cache_invalid "$cache_key" || ! _retrieve_cache "$cache_key"; then
-        lines=("${(@f)$(revshell --show-options "$payload" 2>/dev/null)}")
+        lines=("${(@f)$(revshell --list-options "$payload" 2>/dev/null)}")
         _store_cache "$cache_key" lines
     fi
     print -rl -- "${lines[@]}"
@@ -84,7 +84,7 @@ if [[ -z "$(__revshell_current_payload 2>/dev/null)" ]]; then
     _arguments -C \
         '(-h --help)'{-h,--help}'[show help]' \
         '(-l --list)'{-l,--list}'[list available payloads]' \
-        '--show-options[show options for a payload]:payload:__revshell_describe_payloads' \
+        '--list-options[show options for a payload]:payload:__revshell_describe_payloads' \
         '1:PAYLOAD:__revshell_describe_payloads'
 else
     _arguments -C \
