@@ -2,6 +2,9 @@ import sys
 from ast import literal_eval
 from functools import lru_cache
 from typing import Any, Callable, Iterator, Optional
+from shlex import quote
+
+import regex as re
 
 from . import __name__ as prog
 from .util import _signature, get_kwdefaults, get_local_interfaces
@@ -51,24 +54,29 @@ def init_formatters():
 _REVSHELL_FORMATTERS: dict[str, Callable[..., str]] = init_formatters()
 
 
+def define_groups(**patterns: str):
+    res = "(?(DEFINE)%s)" % ''.join(named_groups(**patterns).values())
+    return res.format_map({k: subroutine(k) for k in patterns})
+
+
+def named_groups(**patterns: str):
+    return {k: f"(?P<{k}>{v})" for k, v in patterns.items()}
+
+
+def subroutine(__s: str):
+    return f"(?&{__s})"
+
+
+def any_of(*choices: str):
+    return '|'.join(choices)
+
+
+def group(*choices: str):
+    return f"(?:{any_of(*choices)})"
+
+
 @lru_cache(maxsize=1)
-def kv_pair_re():
-    def define_groups(**patterns: str):
-        res = "(?(DEFINE)%s)" % ''.join(named_groups(**patterns).values())
-        return res.format_map({k: subroutine(k) for k in patterns})
-
-    def named_groups(**patterns: str):
-        return {k: f"(?P<{k}>{v})" for k, v in patterns.items()}
-
-    def subroutine(__s: str):
-        return f"(?&{__s})"
-
-    def any_of(*choices: str):
-        return '|'.join(choices)
-
-    def group(*choices: str):
-        return f"(?:{any_of(*choices)})"
-
+def py_literal_re_define():
     def stringprefix():
         from collections import defaultdict
         from itertools import permutations
@@ -112,24 +120,24 @@ def kv_pair_re():
             *(f"{q}{group(rf"[^\n{q}\\]", "{stringescape}")}*{q}" for q in "\"\'")
         ),
     )
+    return pattern
 
-    from operator import itemgetter
 
-    [ident, literal, string] = itemgetter("key", "literal", "str")(
-        named_groups(
-            key=r'[A-Z_a-z]\w*',
-            literal=any_of(
-                *map(repr, [True, False, None]),
-                *map(subroutine, ['number', 'stringliteral']),
-            ),
-            str='.*',
-        )
+@lru_cache(maxsize=1)
+def _py_literal_re_pattern():
+    pattern = any_of(
+        *map(repr, [True, False, None]),
+        *map(subroutine, ['number', 'stringliteral']),
     )
+    return pattern
+
+
+@lru_cache(maxsize=1)
+def kv_pair_re():
+    d = named_groups(key=r'[A-Z_a-z]\w*', literal=_py_literal_re_pattern(), str='.*')
+    ident, literal, string = (d[k] for k in ["key", "literal", "str"])
     value = group(literal, string)
-    pattern += f"^{ident}={value}$"
-
-    import regex as re
-
+    pattern = py_literal_re_define() + f"^{ident}={value}$"
     return re.compile(pattern, re.UNICODE)
 
 
@@ -159,49 +167,52 @@ def portnumber(__x: str) -> int:
 def print_payload_list():
     if sys.stdout.isatty():
         fmt_s = '{: <%d}{}'
-        fmt_s %= max(map(len, _REVSHELL_FORMATTERS)) + 10
+        fmt_s %= max(map(len, _REVSHELL_FORMATTERS)) + 8
     else:
         fmt_s = '{}\t{}'
 
     from string import whitespace
 
     norm_space = str.maketrans(dict.fromkeys(whitespace, 0x20))
-    return print(
-        *(
-            (
-                fmt_s.format(
-                    k, fn.__doc__.splitlines()[0].translate(norm_space).strip()
-                )
-                if (fn.__doc__ or '').strip()
-                else k
-            )
-            for k, fn in sorted(_REVSHELL_FORMATTERS.items(), key=lambda x: x[0])
-        ),
-        sep='\n',
-    )
+    out = []
+    for k, fn in sorted(_REVSHELL_FORMATTERS.items(), key=lambda x: x[0]):
+        if (fn.__doc__ or "").strip():
+            desc = fn.__doc__.splitlines()[0].translate(norm_space).strip()
+            out.append(fmt_s.format(k, desc))
+        else:
+            out.append(k)
+    return print(*out, sep='\n')
 
 
+@lru_cache(maxsize=1)
 def get_extra_options(__f: Callable) -> dict[str, Any]:
     return get_kwdefaults(__f) or {}
 
 
-def print_extra_options(ident: str):
-    from shlex import quote
-
-    sep = '=' if sys.stdout.isatty() else '\t'
+def print_extra_options(__f: Callable, /, **kwargs):
+    kwd_opts = get_extra_options(__f)
+    if kwargs.keys() - kwd_opts.keys():
+        raise ValueError
+    kwd_opts |= kwargs
+    sep = "=" if sys.stdout.isatty() else "\t"
+    literal_re = re.compile(
+        py_literal_re_define() + _py_literal_re_pattern(),
+        re.UNICODE,
+    )
     out = []
-    for k, v in get_extra_options(_REVSHELL_FORMATTERS[ident]).items():
-        if v in {"True", "False", "None", "..."}:
-            v = '"%s"' % v
-        elif not isinstance(v, str):
+    for k, v in kwd_opts.items():
+        k = k.upper()
+        if isinstance(v, str):
+            if literal_re.fullmatch(v):
+                v = '"%s"' % v
+        else:
             v = repr(v)
-        out.append(f"{k.upper()}{sep}{quote(v)}")
+        out.append(f"{k}{sep}{quote(v)}")
     return print(*out, sep='\n')
 
 
 def main():
     import argparse
-    from textwrap import dedent
 
     payload_options = sorted(_REVSHELL_FORMATTERS, key=lambda s: s.split('/'))
 
@@ -212,7 +223,11 @@ def main():
                 return payload_options[i]
         return __s
 
-    top = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
+    top = argparse.ArgumentParser(
+        add_help=False,
+        allow_abbrev=False,
+        argument_default=argparse.SUPPRESS,
+    )
     fmt_help = top.add_argument_group('payload help')
     fmt_help.add_argument(
         "-l",
@@ -224,37 +239,52 @@ def main():
     fmt_help.add_argument(
         "--list-options",
         dest="show_options",
-        choices=payload_options,
-        type=payload_opt,
-        metavar="PAYLOAD",
-        help="show keyword defaults for a specific payload and exit",
+        action="store_true",
+        help="show keyword defaults for PAYLOAD and exit",
     )
-
-    top_ns, rest = top.parse_known_args()
-    if getattr(top_ns, 'list_payloads', False):
-        return print_payload_list()
-    if hasattr(top_ns, 'show_options'):
-        return print_extra_options(top_ns.show_options)
-
-    parser = argparse.ArgumentParser(
+    fmt_parser = argparse.ArgumentParser(
         parents=[top],
-        description="generate a reverse shell payload",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        add_help=False,
+        allow_abbrev=False,
+        argument_default=argparse.SUPPRESS,
+        exit_on_error=False,
     )
-    parser.add_argument(
+    fmt_parser.add_argument(
         dest="formatter",
         choices=payload_options,
         type=payload_opt,
         metavar="PAYLOAD",
         help="which payload generator to use",
     )
-    parser.add_argument(
+    fmt_parser.add_argument(
+        "-v",
+        "--assign",
+        dest="extra_options",
+        action="append",
+        type=kv_pair,
+        metavar="VAR=VAL",
+        help=" ".join(
+            [
+                "assigns value VAL to variable VAR,",
+                "for kwargs to the payload function.",
+                "show var defaults with '--list-options'",
+            ]
+        ),
+        default=argparse.SUPPRESS,
+    )
+    fmt_args_parser = argparse.ArgumentParser(
+        add_help=False,
+        allow_abbrev=False,
+        argument_default=argparse.SUPPRESS,
+        exit_on_error=False,
+    )
+    fmt_args_parser.add_argument(
         dest="lhost",
         type=localhost,
         metavar="LHOST",
         help="ipv4 address or name of local network interface",
     )
-    parser.add_argument(
+    fmt_args_parser.add_argument(
         dest="lport",
         type=portnumber,
         metavar="LPORT",
@@ -262,45 +292,48 @@ def main():
         default=4444,
         help="listener port",
     )
-    parser.add_argument(
-        "-v",
-        "--assign",
-        dest="extra_options",
-        action="append",
-        type=kv_pair,
-        metavar="VAR=VAL",
-        help=dedent("""\
-            assigns value VAL to variable VAR,
-            for kwargs to the payload function.
-            show var defaults with '--list-options'
-            """),
-        default=argparse.SUPPRESS,
+
+    fake_parser = argparse.ArgumentParser(
+        parents=[fmt_parser, fmt_args_parser],
+        description="generate a reverse shell payload",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        allow_abbrev=False,
+        **({"prog": prog} if sys.argv[0] == __file__ else {}),
     )
-    parsed_args = {
-        k: v for k, v in vars(parser.parse_args(rest)).items() if k not in top_ns
-    }
-    ident = parsed_args.pop("formatter")
-    formatter = _REVSHELL_FORMATTERS[ident]
-    if "extra_options" in parsed_args:
-        extra_options = dict(parsed_args.pop("extra_options"))
-        expected = get_extra_options(formatter)
-        diff = []
-        for k, v in list(extra_options.items()):
-            try:
-                kx = next(x for x in expected if x.casefold() == k.casefold())
-            except StopIteration:
-                diff.append(k)
-            else:
-                if kx not in extra_options:
-                    extra_options[kx] = extra_options.pop(k)
-        if diff:
-            return parser.error(
-                'unexpected keywords for {!r}: {}'.format(
-                    ident, sorted(set(diff), key=diff.index)
+
+    try:
+        ns, rest = top.parse_known_args()
+        if getattr(ns, 'list_payloads', False):
+            return print_payload_list()
+        ns, rest = fmt_parser.parse_known_args(rest, ns)
+        formatter = _REVSHELL_FORMATTERS[ns.formatter]
+        kwargs = {}
+        if hasattr(ns, "extra_options"):
+            unknown_options = []
+            kwd_opts = get_extra_options(formatter)
+            for k, v in ns.extra_options:
+                for x in kwd_opts:
+                    if x.casefold() == k.casefold():
+                        kwargs[x] = v
+                        break
+                else:
+                    if k in unknown_options:
+                        continue
+                    unknown_options.append(k)
+            if unknown_options:
+                fmt_parser.error(
+                    "unrecognized options for %r: %s"
+                    % (ns.formatter, ", ".join(map(quote, unknown_options)))
                 )
-            )
-        parsed_args |= extra_options
-    return print(formatter(**parsed_args))
+        if getattr(ns, "show_options", False):
+            return print_extra_options(formatter, **kwargs)
+        ns = fmt_args_parser.parse_args(rest, ns)
+    except argparse.ArgumentError as e:
+        if set(rest) & {"--help", "-h"}:
+            return fake_parser.print_help()
+        return fake_parser.error(e)
+    else:
+        return print(formatter(ns.lhost, ns.lport, **kwargs))
 
 
 if __name__ == "__main__":

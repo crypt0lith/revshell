@@ -84,10 +84,11 @@ if [[ -z "$(__revshell_current_payload 2>/dev/null)" ]]; then
     _arguments -C \
         '(-h --help)'{-h,--help}'[show help]' \
         '(-l --list)'{-l,--list}'[list available payloads]' \
-        '--list-options[show options for a payload]:payload:__revshell_describe_payloads' \
         '1:PAYLOAD:__revshell_describe_payloads'
 else
+    local payload="$(__revshell_current_payload 2>/dev/null)"
     _arguments -C \
+        "--list-options[show options for ${payload:-PAYLOAD}]" \
         '*'{-v,--assign}'[assign VAR=VAL]:VAR=VAL:__revshell_complete_assign' \
         '1:PAYLOAD:__revshell_describe_payloads' \
         '2:LHOST:_net_interfaces' \
