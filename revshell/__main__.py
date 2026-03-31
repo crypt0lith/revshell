@@ -6,7 +6,7 @@ from shlex import quote
 
 import regex as re
 
-from . import __name__ as prog
+from . import __name__ as prog, __version__
 from .util import _signature, get_kwdefaults, get_local_interfaces
 
 
@@ -223,10 +223,21 @@ def main():
                 return payload_options[i]
         return __s
 
+    from os.path import isfile, samefile
+
+    prog_kwd = (
+        {"prog": prog}
+        if (isfile(sys.argv[0]) and samefile(sys.argv[0], __file__))
+        else {}
+    )
     top = argparse.ArgumentParser(
         add_help=False,
         allow_abbrev=False,
         argument_default=argparse.SUPPRESS,
+        **prog_kwd,
+    )
+    top.add_argument(
+        "-V", "--version", action="version", version=f"%(prog)s {__version__}"
     )
     fmt_help = top.add_argument_group('payload help')
     fmt_help.add_argument(
@@ -298,7 +309,7 @@ def main():
         description="generate a reverse shell payload",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         allow_abbrev=False,
-        **({"prog": prog} if sys.argv[0] == __file__ else {}),
+        **prog_kwd,
     )
 
     try:
