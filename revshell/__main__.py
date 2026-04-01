@@ -247,11 +247,12 @@ def main():
         action="store_true",
         help="list all currently available payloads and exit",
     )
+    payload_metavar = "PAYLOAD"
     fmt_help.add_argument(
         "--list-options",
         dest="show_options",
         action="store_true",
-        help="show keyword defaults for PAYLOAD and exit",
+        help=f"show optional keyword vars and assigned values for {payload_metavar} and exit",
     )
     fmt_parser = argparse.ArgumentParser(
         parents=[top],
@@ -264,10 +265,11 @@ def main():
         dest="formatter",
         choices=payload_options,
         type=payload_opt,
-        metavar="PAYLOAD",
+        metavar=payload_metavar,
         help="which payload generator to use",
     )
-    fmt_parser.add_argument(
+    payload_opts_group = fmt_parser.add_argument_group("payload options")
+    var_assign_action = payload_opts_group.add_argument(
         "-v",
         "--assign",
         dest="extra_options",
@@ -278,7 +280,7 @@ def main():
             [
                 "assigns value VAL to variable VAR,",
                 "for kwargs to the payload function.",
-                "show var defaults with '--list-options'",
+                "see '--list-options'",
             ]
         ),
         default=argparse.SUPPRESS,
@@ -312,6 +314,11 @@ def main():
         **prog_kwd,
     )
 
+    opt_indices = slice(
+        1, next((i + 1 for i, x in enumerate(sys.argv[1:]) if x == "--"), None)
+    )
+    if set(sys.argv[opt_indices]) & {"-h", "--help"}:
+        return fake_parser.print_help()
     try:
         ns, rest = top.parse_known_args()
         if getattr(ns, 'list_payloads', False):
@@ -320,7 +327,6 @@ def main():
         formatter = _REVSHELL_FORMATTERS[ns.formatter]
         kwargs = {}
         if hasattr(ns, "extra_options"):
-            unknown_options = []
             kwd_opts = get_extra_options(formatter)
             for k, v in ns.extra_options:
                 for x in kwd_opts:
@@ -328,20 +334,14 @@ def main():
                         kwargs[x] = v
                         break
                 else:
-                    if k in unknown_options:
-                        continue
-                    unknown_options.append(k)
-            if unknown_options:
-                fmt_parser.error(
-                    "unrecognized options for %r: %s"
-                    % (ns.formatter, ", ".join(map(quote, unknown_options)))
-                )
+                    raise argparse.ArgumentError(
+                        var_assign_action,
+                        f"invalid keyword for {ns.formatter!r}: {k!r}",
+                    )
         if getattr(ns, "show_options", False):
             return print_extra_options(formatter, **kwargs)
         ns = fmt_args_parser.parse_args(rest, ns)
     except argparse.ArgumentError as e:
-        if set(rest) & {"--help", "-h"}:
-            return fake_parser.print_help()
         return fake_parser.error(e)
     else:
         return print(formatter(ns.lhost, ns.lport, **kwargs))
