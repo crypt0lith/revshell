@@ -60,32 +60,29 @@ def kwdefaults_from(*callables: Callable) -> Callable:
     def decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
         kw_only = (get_kwdefaults(func) or {}) | kwdefaults
         sig = _signature(func)
+        params_iter = chain(
+            (
+                p
+                for p in sig.parameters.values()
+                if p.kind is not Parameter.KEYWORD_ONLY
+            ),
+            (
+                Parameter(k, Parameter.KEYWORD_ONLY, default=v)
+                for k, v in kw_only.items()
+            ),
+        )
+        params = [
+            x
+            for _, x in sorted(
+                enumerate(params_iter),
+                key=lambda ix: (ix[1].kind, ix[0]),
+            )
+        ]
         new_sig = inspect.Signature(
-            [
-                x
-                for _, x in sorted(
-                    (
-                        ((x.kind, i), x)
-                        for i, x in enumerate(
-                            chain(
-                                (
-                                    p
-                                    for p in sig.parameters.values()
-                                    if p.kind is not Parameter.KEYWORD_ONLY
-                                ),
-                                (
-                                    Parameter(k, Parameter.KEYWORD_ONLY, default=v)
-                                    for k, v in kw_only.items()
-                                ),
-                            )
-                        )
-                    ),
-                    key=lambda x: x[0],
-                )
-            ],
+            params,
             return_annotation=sig.return_annotation,
         )
-
+        
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs):
             for k, v in kw_only.items():
