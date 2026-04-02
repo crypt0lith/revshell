@@ -1,57 +1,15 @@
 import sys
 from ast import literal_eval
 from functools import lru_cache
-from typing import Any, Callable, Iterator, Optional
 from shlex import quote
+from typing import Any, Callable, Iterator, Optional
 
 import regex as re
 
-from . import __name__ as prog, __version__
+from . import __name__ as prog
+from . import __version__
+from .formatters import FORMATTERS, init_formatters
 from .util import _signature, get_kwdefaults, get_local_interfaces
-
-
-def init_formatters():
-    from inspect import Parameter
-    from types import FunctionType, ModuleType
-
-    def inner(module: ModuleType) -> Iterator[tuple[str, FunctionType]]:
-        for name in getattr(module, '__all__', []):
-            x = getattr(module, name)
-            if isinstance(x, ModuleType):
-                yield from inner(x)
-            elif isinstance(x, FunctionType):
-                try:
-                    sig = _signature(x)
-                except Exception:
-                    continue
-
-                # signature must accept these as non-varkw kwargs
-                varnames = 'lhost', 'lport'
-
-                # validation loop
-                for varname in varnames:
-                    for p in sig.parameters.values():
-                        if p.name == varname and p.kind in {
-                            Parameter.POSITIONAL_OR_KEYWORD,
-                            Parameter.KEYWORD_ONLY,
-                        }:
-                            # varname is valid
-                            # break inner parameter loop
-                            break
-                    else:
-                        # varname not found or is wrong kind
-                        # break outer validation loop
-                        break
-                else:
-                    # signature is valid
-                    ident = x.__module__.removeprefix(prog).strip('.')
-                    ident = '/'.join(ident.split('.') + [x.__name__])
-                    yield (ident, x)
-
-    return dict(inner(sys.modules[prog]))
-
-
-_REVSHELL_FORMATTERS: dict[str, Callable[..., str]] = init_formatters()
 
 
 def define_groups(**patterns: str):
@@ -167,7 +125,7 @@ def portnumber(__x: str) -> int:
 def print_payload_list():
     if sys.stdout.isatty():
         fmt_s = '{: <%d}{}'
-        fmt_s %= max(map(len, _REVSHELL_FORMATTERS)) + 8
+        fmt_s %= max(map(len, FORMATTERS)) + 8
     else:
         fmt_s = '{}\t{}'
 
@@ -175,7 +133,7 @@ def print_payload_list():
 
     norm_space = str.maketrans(dict.fromkeys(whitespace, 0x20))
     out = []
-    for k, fn in sorted(_REVSHELL_FORMATTERS.items(), key=lambda x: x[0]):
+    for k, fn in sorted(FORMATTERS.items(), key=lambda x: x[0]):
         if (fn.__doc__ or "").strip():
             desc = fn.__doc__.splitlines()[0].translate(norm_space).strip()
             out.append(fmt_s.format(k, desc))
@@ -214,13 +172,15 @@ def print_extra_options(__f: Callable, /, **kwargs):
 def main():
     import argparse
 
-    payload_options = sorted(_REVSHELL_FORMATTERS, key=lambda s: s.split('/'))
+    init_formatters()
+    payload_options = sorted(FORMATTERS, key=lambda s: s.split('/'))
 
     def payload_opt(__s: str):
         if __s.isdigit():
             i = int(__s)
             if i < len(payload_options):
                 return payload_options[i]
+            raise ValueError
         return __s
 
     from os.path import isfile, samefile
@@ -324,7 +284,7 @@ def main():
         if getattr(ns, 'list_payloads', False):
             return print_payload_list()
         ns, rest = fmt_parser.parse_known_args(rest, ns)
-        formatter = _REVSHELL_FORMATTERS[ns.formatter]
+        formatter = FORMATTERS[ns.formatter]
         kwargs = {}
         if hasattr(ns, "extra_options"):
             kwd_opts = get_extra_options(formatter)

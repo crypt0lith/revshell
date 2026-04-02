@@ -1,9 +1,10 @@
-__all__ = ['reverse_bash', 'reverse_python']
-
 import random
 from shlex import quote
 
+from revshell.formatters import register
 
+
+@register
 def reverse_bash(
     lhost: str, lport: int, *, bash_path: str | None = "bash", shell_path="sh"
 ) -> str:
@@ -23,6 +24,7 @@ def reverse_bash(
     return f"{bash_path} -c {quote(cmd)}"
 
 
+@register
 def reverse_python(
     lhost: str, lport: int, *, py_path="python3", shell_path="sh"
 ) -> str:

