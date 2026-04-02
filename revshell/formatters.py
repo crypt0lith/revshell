@@ -12,6 +12,7 @@ FORMATTERS = dict[str, RevshellCallable]()
 _M_CACHE = defaultdict(dict)
 _PREFIX = f"{revshell.__name__}."
 
+
 def register[_F: RevshellCallable](__f: _F, /) -> _F:
     caller_frame = inspect.stack()[1].frame
     module_name = caller_frame.f_globals["__name__"]
@@ -19,12 +20,16 @@ def register[_F: RevshellCallable](__f: _F, /) -> _F:
     pos_arg_names = "lhost", "lport"
     for i, p in enumerate(_signature(__f).parameters.values()):
         if i < len(pos_arg_names):
-            if p.name != pos_arg_names[i]:
+            if (
+                p.name != pos_arg_names[i]
+                or p.kind > inspect.Parameter.POSITIONAL_OR_KEYWORD
+            ):
                 raise ValueError
         elif p.kind < inspect.Parameter.KEYWORD_ONLY:
             raise ValueError
     _M_CACHE[module_name][__f.__name__] = __f
     return __f
+
 
 def init_formatters():
     for module_info in pkgutil.walk_packages(revshell.__path__, prefix=_PREFIX):
