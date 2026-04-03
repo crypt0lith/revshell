@@ -235,17 +235,15 @@ def main():
 
     from os.path import isfile, samefile
 
-    prog_kwd = (
-        {"prog": prog}
-        if (isfile(sys.argv[0]) and samefile(sys.argv[0], __file__))
-        else {}
-    )
-    top = argparse.ArgumentParser(
+    parser_defaults = dict(
         add_help=False,
         allow_abbrev=False,
         argument_default=argparse.SUPPRESS,
-        **prog_kwd,
     )
+    if isfile(sys.argv[0]) and samefile(sys.argv[0], __file__):
+        parser_defaults["prog"] = prog
+
+    top = argparse.ArgumentParser(**parser_defaults)
     top.add_argument(
         "-V", "--version", action="version", version=f"%(prog)s {__version__}"
     )
@@ -266,10 +264,8 @@ def main():
     )
     fmt_parser = argparse.ArgumentParser(
         parents=[top],
-        add_help=False,
-        allow_abbrev=False,
-        argument_default=argparse.SUPPRESS,
         exit_on_error=False,
+        **parser_defaults,
     )
     fmt_parser.add_argument(
         dest="formatter",
@@ -296,10 +292,8 @@ def main():
         default=argparse.SUPPRESS,
     )
     fmt_args_parser = argparse.ArgumentParser(
-        add_help=False,
-        allow_abbrev=False,
-        argument_default=argparse.SUPPRESS,
         exit_on_error=False,
+        **parser_defaults,
     )
     fmt_args_parser.add_argument(
         dest="lhost",
@@ -320,8 +314,7 @@ def main():
         parents=[fmt_parser, fmt_args_parser],
         description="generate a reverse shell payload",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        allow_abbrev=False,
-        **prog_kwd,
+        **parser_defaults,
     )
 
     opt_indices = slice(
