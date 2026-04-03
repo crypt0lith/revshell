@@ -77,23 +77,34 @@ def py_literal_re_define():
         stringitems=any_of(
             *(f"{q}{group(rf"[^\n{q}\\]", "{stringescape}")}*{q}" for q in "\"\'")
         ),
-    )
-    return pattern
-
-
-@lru_cache(maxsize=1)
-def _py_literal_re_pattern():
-    pattern = any_of(
-        *map(repr, [True, False, None]),
-        *map(subroutine, ['number', 'stringliteral']),
+        singleton=any_of("True", "False", "None", r"\.{{3}}"),
+        trailingcomma=r"\s*,\s*",
+        tupleitems=r"\s*{literal}\s*(?:,\s*{literal}\s*)*{trailingcomma}?",
+        tuple=r"\(\s*(?:{literal}\s*,{tupleitems}?)?\s*\)",
+        list=r"\[{tupleitems}?\]",
+        set=r"\{{{tupleitems}?\}}",
+        dictitems=(
+            r"\s*{literal}\s*:\s*{literal}\s*"
+            r"(?:\s*,\s*{literal}\s*:\s*{literal})*{trailingcomma}?"
+        ),
+        dict=r"\{{{dictitems}?\}}",
+        literal=any_of(
+            "{singleton}",
+            "{number}",
+            "{stringliteral}",
+            "{tuple}",
+            "{list}",
+            "{set}",
+            "{dict}",
+        ),
     )
     return pattern
 
 
 @lru_cache(maxsize=1)
 def kv_pair_re():
-    d = named_groups(key=r'[A-Z_a-z]\w*', literal=_py_literal_re_pattern(), str='.*')
-    ident, literal, string = (d[k] for k in ["key", "literal", "str"])
+    d = named_groups(key=r'[A-Z_a-z]\w*', pyliteral=subroutine("literal"), str='.*')
+    ident, literal, string = (d[k] for k in ["key", "pyliteral", "str"])
     value = group(literal, string)
     pattern = py_literal_re_define() + f"^{ident}={value}$"
     return re.compile(pattern, re.UNICODE)
@@ -101,8 +112,8 @@ def kv_pair_re():
 
 def kv_pair(__s: str) -> tuple[str, Optional[Any]]:
     if m := kv_pair_re().match(__s):
-        if m["literal"] is not None:
-            value = literal_eval(m["literal"])
+        if m["pyliteral"] is not None:
+            value = literal_eval(m["pyliteral"])
         elif m["str"]:
             value = m["str"]
         else:
@@ -148,24 +159,63 @@ def get_extra_options(__f: Callable) -> dict[str, Any]:
 
 
 def print_extra_options(__f: Callable, /, **kwargs):
+    from json import dumps
+
     kwd_opts = get_extra_options(__f)
     if kwargs.keys() - kwd_opts.keys():
         raise ValueError
     kwd_opts |= kwargs
     sep = "=" if sys.stdout.isatty() else "\t"
     literal_re = re.compile(
-        py_literal_re_define() + _py_literal_re_pattern(),
+        py_literal_re_define() + subroutine("literal"),
         re.UNICODE,
     )
+
+    def wrap_s(s: str):
+        return dumps(s, ensure_ascii=False)
+
+    def to_cmdline(obj, *, in_iter=False) -> str:
+        if isinstance(obj, str):
+            if in_iter or literal_re.fullmatch(obj):
+                obj = wrap_s(obj)
+        elif isinstance(obj, bytes):
+            obj = repr(obj)
+            if obj.startswith("b'"):
+                obj = 'b' + wrap_s(
+                    obj.removeprefix("b'")
+                    .removesuffix("'")
+                    .replace(r"\'", "'")
+                    .replace('"', r'\"')
+                )
+        elif obj is Ellipsis:
+            obj = "..."
+        elif isinstance(obj, (tuple, list, set)):
+            lhs, rhs = {tuple: "()", list: "[]", set: "{}"}[obj.__class__]
+            if lhs == "(" and len(obj) == 1:
+                trailing_comma = ","
+            else:
+                trailing_comma = ""
+            obj = "".join(
+                [
+                    lhs,
+                    ", ".join(to_cmdline(x, in_iter=True) for x in obj),
+                    trailing_comma,
+                    rhs,
+                ]
+            )
+        elif isinstance(obj, dict):
+            obj = "{%s}" % ", ".join(
+                f"{to_cmdline(k, in_iter=True)}: {to_cmdline(v, in_iter=True)}"
+                for k, v in obj.items()
+            )
+        else:
+            obj = repr(obj)
+        return obj
+
     out = []
     for k, v in kwd_opts.items():
         k = k.upper()
-        if isinstance(v, str):
-            if literal_re.fullmatch(v):
-                v = '"%s"' % v
-        else:
-            v = repr(v)
-        out.append(f"{k}{sep}{quote(v)}")
+        out.append(f"{k}{sep}{quote(to_cmdline(v))}")
     return print(*out, sep='\n')
 
 
