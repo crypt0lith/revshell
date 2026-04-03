@@ -190,8 +190,10 @@ def print_extra_options(__f: Callable, /, **kwargs):
         elif obj is Ellipsis:
             obj = "..."
         elif isinstance(obj, (tuple, list, set)):
-            lhs, rhs = {tuple: "()", list: "[]", set: "{}"}[obj.__class__]
-            if lhs == "(" and len(obj) == 1:
+            lhs, rhs = {    # type: ignore[str-unpack]
+                tuple: "()", list: "[]", set: "{}"
+            }[objtype := obj.__class__]
+            if objtype is tuple and len(obj) == 1:
                 trailing_comma = ","
             else:
                 trailing_comma = ""
