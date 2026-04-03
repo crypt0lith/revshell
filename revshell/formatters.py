@@ -2,6 +2,7 @@ import importlib
 import inspect
 import pkgutil
 from collections import defaultdict
+from typing import Callable
 
 import revshell
 
@@ -9,11 +10,11 @@ from ._typing import RevshellCallable
 from .util import _signature
 
 FORMATTERS = dict[str, RevshellCallable]()
-_M_CACHE = defaultdict(dict)
+_M_CACHE = defaultdict[str, dict[str, RevshellCallable]](dict)
 _PREFIX = f"{revshell.__name__}."
 
 
-def register[_F: RevshellCallable](__f: _F, /) -> _F:
+def register[_F: (RevshellCallable, Callable[..., str])](__f: _F, /) -> _F:
     caller_frame = inspect.stack()[1].frame
     module_name = caller_frame.f_globals["__name__"]
     module_name = module_name.removeprefix(_PREFIX)
