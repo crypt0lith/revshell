@@ -82,7 +82,7 @@ def py_literal_re_define():
         tupleitems=r"\s*{literal}\s*(?:,\s*{literal}\s*)*{trailingcomma}?",
         tuple=r"\(\s*(?:{literal}\s*,{tupleitems}?)?\s*\)",
         list=r"\[{tupleitems}?\]",
-        set=r"\{{{tupleitems}?\}}",
+        set=r"\{{{tupleitems}\}}",
         dictitems=(
             r"\s*{literal}\s*:\s*{literal}\s*"
             r"(?:\s*,\s*{literal}\s*:\s*{literal})*{trailingcomma}?"
@@ -94,8 +94,8 @@ def py_literal_re_define():
             "{stringliteral}",
             "{tuple}",
             "{list}",
-            "{set}",
             "{dict}",
+            "{set}",
         ),
     )
     return pattern
