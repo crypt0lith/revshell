@@ -225,13 +225,13 @@ def main():
     import argparse
 
     init_formatters()
-    payload_options = sorted(FORMATTERS, key=lambda s: s.split('/'))
+    formatters_lst = sorted(FORMATTERS, key=lambda s: s.split('/'))
 
     def payload_opt(__s: str):
         if __s.isdigit():
             i = int(__s)
-            if i < len(payload_options):
-                return payload_options[i]
+            if i < len(formatters_lst):
+                return formatters_lst[i]
             raise ValueError
         return __s
 
@@ -271,7 +271,7 @@ def main():
     )
     fmt_parser.add_argument(
         dest="formatter",
-        choices=payload_options,
+        choices=formatters_lst,
         type=payload_opt,
         metavar=payload_metavar,
         help="which payload generator to use",
