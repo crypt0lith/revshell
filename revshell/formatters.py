@@ -14,12 +14,12 @@ _M_CACHE = defaultdict[str, dict[str, RevshellCallable]](dict)
 _PREFIX = f"{revshell.__name__}."
 
 
-def register[_F: (RevshellCallable, Callable[..., str])](__f: _F, /) -> _F:
+def register[_F: (RevshellCallable, Callable[..., str])](f: _F, /) -> _F:
     caller_frame = inspect.stack()[1].frame
     module_name = caller_frame.f_globals["__name__"]
     module_name = module_name.removeprefix(_PREFIX)
     pos_arg_names = "lhost", "lport"
-    for i, p in enumerate(_signature(__f).parameters.values()):
+    for i, p in enumerate(_signature(f).parameters.values()):
         if i < len(pos_arg_names):
             if (
                 p.name != pos_arg_names[i]
@@ -28,8 +28,8 @@ def register[_F: (RevshellCallable, Callable[..., str])](__f: _F, /) -> _F:
                 raise ValueError
         elif p.kind < inspect.Parameter.KEYWORD_ONLY:
             raise ValueError
-    _M_CACHE[module_name][__f.__name__] = __f
-    return __f
+    _M_CACHE[module_name][f.__name__] = f
+    return f
 
 
 def init_formatters():

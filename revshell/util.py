@@ -35,17 +35,17 @@ except ImportError:
 
 
 @lru_cache
-def _signature(__f: Callable):
-    return inspect.signature(__f)
+def _signature(f: Callable, /):
+    return inspect.signature(f)
 
 
-def get_kwdefaults(__f: Callable):
-    if not callable(__f):
+def get_kwdefaults(f: Callable, /):
+    if not callable(f):
         raise TypeError
     try:
         return {
             v.name: v.default
-            for v in _signature(__f).parameters.values()
+            for v in _signature(f).parameters.values()
             if v.kind is Parameter.KEYWORD_ONLY and v.default is not Parameter.empty
         } or None
     except Exception:

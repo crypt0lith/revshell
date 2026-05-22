@@ -2,14 +2,14 @@ import sys
 from ast import literal_eval
 from functools import lru_cache
 from shlex import quote
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Optional
 
 import regex as re
 
 from . import __name__ as prog
 from . import __version__
 from .formatters import FORMATTERS, init_formatters
-from .util import _signature, get_kwdefaults, get_local_interfaces
+from .util import get_kwdefaults, get_local_interfaces
 
 
 def define_groups(**patterns: str):
@@ -21,8 +21,8 @@ def named_groups(**patterns: str):
     return {k: f"(?P<{k}>{v})" for k, v in patterns.items()}
 
 
-def subroutine(__s: str):
-    return f"(?&{__s})"
+def subroutine(s: str, /):
+    return f"(?&{s})"
 
 
 def any_of(*choices: str):
@@ -122,12 +122,12 @@ def kv_pair(__s: str) -> tuple[str, Optional[Any]]:
     raise ValueError
 
 
-def localhost(__s: str) -> str:
-    return get_local_interfaces().get(__s, __s)
+def localhost(s: str, /) -> str:
+    return get_local_interfaces().get(s, s)
 
 
-def portnumber(__x: str) -> int:
-    n = int(__x, 10)
+def portnumber(x: str, /) -> int:
+    n = int(x, 10)
     if not 0 <= n <= 0x10000:
         raise ValueError
     return n
@@ -145,8 +145,8 @@ def print_payload_list():
     norm_space = str.maketrans(dict.fromkeys(whitespace, 0x20))
     out = []
     for k, fn in sorted(FORMATTERS.items(), key=lambda x: x[0]):
-        if (fn.__doc__ or "").strip():
-            desc = fn.__doc__.splitlines()[0].translate(norm_space).strip()
+        if docstring := (fn.__doc__ or "").strip():
+            desc = docstring.splitlines()[0].translate(norm_space).strip()
             out.append(fmt_s.format(k, desc))
         else:
             out.append(k)
@@ -154,14 +154,14 @@ def print_payload_list():
 
 
 @lru_cache(maxsize=1)
-def get_extra_options(__f: Callable) -> dict[str, Any]:
-    return get_kwdefaults(__f) or {}
+def get_extra_options(f: Callable, /) -> dict[str, Any]:
+    return get_kwdefaults(f) or {}
 
 
-def print_extra_options(__f: Callable, /, **kwargs):
+def print_extra_options(f: Callable, /, **kwargs):
     from json import dumps
 
-    kwd_opts = get_extra_options(__f)
+    kwd_opts = get_extra_options(f)
     if kwargs.keys() - kwd_opts.keys():
         raise ValueError
     kwd_opts |= kwargs
@@ -171,7 +171,7 @@ def print_extra_options(__f: Callable, /, **kwargs):
         re.UNICODE,
     )
 
-    def wrap_s(s: str):
+    def wrap_s(s: str, /):
         return dumps(s, ensure_ascii=False)
 
     def to_cmdline(obj, *, in_iter=False) -> str:
@@ -227,17 +227,17 @@ def main():
     init_formatters()
     formatters_lst = sorted(FORMATTERS, key=lambda s: s.split('/'))
 
-    def payload_opt(__s: str):
-        if __s.isdigit():
-            i = int(__s)
+    def payload_opt(s: str, /):
+        if s.isdigit():
+            i = int(s)
             if i < len(formatters_lst):
                 return formatters_lst[i]
             raise ValueError
-        return __s
+        return s
 
     from os.path import isfile, samefile
 
-    parser_defaults = dict(
+    parser_defaults: dict[str, Any] = dict(
         add_help=False,
         allow_abbrev=False,
         argument_default=argparse.SUPPRESS,
